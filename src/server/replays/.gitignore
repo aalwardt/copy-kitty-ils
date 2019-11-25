@@ -1,0 +1,5 @@
+# This directory will be used for storing and serving replay files
+# Ignore everything in this directory
+*
+# Except this file
+!.gitignore

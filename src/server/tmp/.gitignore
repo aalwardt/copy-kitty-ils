@@ -1,0 +1,5 @@
+# This directory will be used for storing uploads before processing
+# Ignore everything in this directory
+*
+# Except this file
+!.gitignore

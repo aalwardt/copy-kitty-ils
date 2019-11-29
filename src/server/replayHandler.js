@@ -1,7 +1,7 @@
 /**
  * Parses .replaykitty files to extract relevant data
  */
-const fs = require('fs')
+const fs = require('fs').promises
 const path = require('path')
 
 /** Replay format (courtesy of Azure)
@@ -55,86 +55,112 @@ int16 seconds
 int16 frames
 **/
 
-function parseReplay(replayPath) {
-	fs.readFile(replayPath, (err, data) => {
-		if (err) { throw err }
+module.exports = (replayPath) => {  
+  return fs.readFile(replayPath).then(data => {
 
-		const buffer = new BufferParser(data)
-		let replayData = {}
+    let replayData = {}
+    const buffer = new BufferParser(data)
 
-		// Step through the file, storing relevant fields		
-		replayData.buildNum = buffer.getNextInt32()				// Build number
-		// Is this in an older format?
-		let oldReplay = replayData.buildNum < 1486 
-		replayData.version = buffer.getNextString()				// Version string
-		replayData.gamemode = buffer.getNextInt32()				// Game mode
-		buffer.getNextInt32() 														// Random seed
-		buffer.getNextString() 														// Filename
-		replayData.levelname = buffer.getNextString()			// Level name
-		replayData.username = buffer.getNextString()			// Username
-		buffer.getNextInt32() 														// Starting wave
-		buffer.getNextInt32() 														// Endless path
-		buffer.getNextInt32() 														// Num starting weapons
-		replayData.cheated = buffer.getNextBoolean()			// Cheats Active
-		buffer.offset += oldReplay ? 36 : 37							// 36 or 37 cheats, format dependent
-		replayData.difficulty = buffer.getNextBoolean()		// Difficulty
-		buffer.getNextBoolean()														// Restarted
-		replayData.character = buffer.getNextInt32()			// Character
-		buffer.offset += oldReplay ? 0 : 4								// Newer format only int32
-		buffer.offset += 64																// Many fields we can ignore
-		buffer.getNextString()														// 2 strings we can ignore
-		buffer.getNextString()
-		buffer.offset++																		// Ignored bool
-		let numNextEntries = buffer.getNextInt32()				// How many times next entry repeats
-		buffer.offset += numNextEntries * 2								// ...which is also ignored (Int16)
-		replayData.month = buffer.getNextInt16()					// Month
-		replayData.day = buffer.getNextInt16()						// Day
-		replayData.year = buffer.getNextInt16()						// Year
-		replayData.score = buffer.getNextInt32()					// Score
-		replayData.minutes = buffer.getNextInt32()				// Minutes
-		replayData.seconds = buffer.getNextInt16()				// Seconds
-		replayData.frames = buffer.getNextInt16()					// Frames
+    // Step through the file, storing relevant fields   
+    replayData.buildNum = buffer.getNextInt32()       // Build number
 
-		console.log(replayData)
-	})
+    // Is this in an older format?
+    let oldReplay = replayData.buildNum < 1486 
+    if ( replayData.buildNum < 1483 ) {
+      throw new ReplayFormatError("Replay rejected: Replays from versions older than 1483 are not accepted!")
+    }
+
+    replayData.version = buffer.getNextString()       // Version string
+    replayData.gamemode = buffer.getNextInt32()       // Game mode
+
+    if ( replayData.gamemode != 0 ) {
+      throw new ReplayFormatError("Replay rejected: Only story mode replays are accepted!")
+    }
+
+    buffer.getNextInt32()                             // Random seed
+    buffer.getNextString()                            // Filename
+    replayData.levelname = buffer.getNextString()     // Level name
+
+    // TODO: Code for associating level name with list of level names
+    // Reject replay if it isn't in a map of level names
+    // Also, possibly add world and level fields to object here
+
+    replayData.username = buffer.getNextString()      // Username
+    buffer.getNextInt32()                             // Starting wave
+    buffer.getNextInt32()                             // Endless path
+    buffer.getNextInt32()                             // Num starting weapons
+    replayData.cheated = buffer.getNextBoolean()      // Cheats Active
+
+    if ( replayData.cheated ) {
+      throw new ReplayFormatError("Replay rejected: Cheats are not allowed!")
+    }
+
+    buffer.offset += oldReplay ? 36 : 37              // 36 or 37 cheats, format dependent
+    replayData.difficulty = buffer.getNextBoolean()   // Difficulty
+    buffer.getNextBoolean()                           // Restarted
+    replayData.character = buffer.getNextInt32()      // Character
+    buffer.offset += oldReplay ? 0 : 4                // Newer format only int32
+    buffer.offset += 64                               // Many fields we can ignore
+    buffer.getNextString()                            // 2 strings we can ignore
+    buffer.getNextString()
+    buffer.offset++                                   // Ignored bool
+    let numNextEntries = buffer.getNextInt32()        // How many times next entry repeats
+    buffer.offset += numNextEntries * 2               // ...which is also ignored (Int16)
+    replayData.month = buffer.getNextInt16()          // Month
+    replayData.day = buffer.getNextInt16()            // Day
+    replayData.year = buffer.getNextInt16()           // Year
+    replayData.score = buffer.getNextInt32()          // Score
+    replayData.minutes = buffer.getNextInt32()        // Minutes
+    replayData.seconds = buffer.getNextInt16()        // Seconds
+    replayData.frames = buffer.getNextInt16()         // Frames
+
+    return replayData
+  })
+}
+
+class ReplayFormatError extends Error {
+  constructor(message) {
+    super(message)
+    this.name = "ReplayFormatError"
+  }
 }
 
 // Wrapper class to allow us to access buffer content sequentially
 class BufferParser {
-	constructor(buffer) {
-		this._buffer = buffer
-		this.offset = 0
-	}
+  constructor(buffer) {
+    this._buffer = buffer
+    this.offset = 0
+  }
 
-	getNextBoolean() {
-		let out = this._buffer.readInt8(this.offset)
-		this.offset++
-		return out === 0 ? false : true
-	}
+  getNextBoolean() {
+    let out = this._buffer.readInt8(this.offset)
+    this.offset++
+    return out === 0 ? false : true
+  }
 
-	getNextInt16() {
-		let out = this._buffer.readInt16LE(this.offset)
-		this.offset += 2
-		return out
-	}
+  getNextInt16() {
+    let out = this._buffer.readInt16LE(this.offset)
+    this.offset += 2
+    return out
+  }
 
-	getNextInt32() {
-		let out = this._buffer.readInt32LE(this.offset)
-		this.offset += 4
-		return out
-	}
+  getNextInt32() {
+    let out = this._buffer.readInt32LE(this.offset)
+    this.offset += 4
+    return out
+  }
 
-	getNextString() {
-		// Get the length of the upcoming string
-		let length = this._buffer.readInt8(this.offset)
-		this.offset++
-		let out = this._buffer.toString('utf8', this.offset, this.offset + length)
-		this.offset += length
-		return out
-	}
+  getNextString() {
+    // Get the length of the upcoming string
+    let length = this._buffer.readInt8(this.offset)
+    this.offset++
+    let out = this._buffer.toString('utf8', this.offset, this.offset + length)
+    this.offset += length
+    return out
+  }
 }
 
 /** Testing code **/
 if (require.main === module) {
-	parseReplay(path.join('replays', '0.replaykitty'))
+  parseReplay(path.join('replays', '0.replaykitty'))
 }

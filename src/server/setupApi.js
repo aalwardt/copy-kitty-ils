@@ -1,19 +1,22 @@
 const path = require('path')
+const fs = require('fs').promises
 const multer = require('multer')
+const PouchDB = require('pouchdb-node')
+
+const parseReplay = require('./replayHandler.js')
+
+/** Directories used for storage **/
+const TEMP_DIR = 'tmp'
+const REPLAY_DIR = 'replays'
+const DATABASE_DIR = 'db'
 
 /** Setup multer options **/
-// const storage = multer.diskStorage({
-//   destination: (req, file, cb) => {
-//     cb(null, path.join(__dirname, 'tmp'))
-//   },
-//   filename: function (req, file, cb) {
-//     cb(null, 'uploaded-' + file.originalname)
-//   }
-// })
 const upload = multer({
   // storage: storage,
-  dest: path.join(__dirname, 'tmp')
+  dest: TEMP_DIR
 })
+/** Setup database **/
+const db = new PouchDB('db')
 
 module.exports = app => {
   // Handle uploaded files
@@ -24,12 +27,14 @@ module.exports = app => {
         success: false
       })
     } else {
-      console.log(`File uploaded: ${req.file.filename}`)
+      console.log(`File uploaded: ${req.file.originalname}`)
       console.log(req.file)
-      return res.send({
-        success: true
+      parseReplay(req.file.path).then( replayData => {
+        console.log(replayData)
+        return res.send(replayData)
       })
+      
+      
     }
-    
   })
 }

@@ -2,6 +2,7 @@
  * Parses .replaykitty files to extract relevant data
  */
 const fs = require('fs').promises
+const moment = require('moment')
 const levelMap = require('./levelMap.js')
 
 /** Replay format (courtesy of Azure)
@@ -83,17 +84,13 @@ function parseReplay(data) {
   // }
 
   buffer.getNextInt32()                             // Random seed
-  
   let filename = buffer.getNextString()             // Filename
-  
-  replayData.levelname = buffer.getNextString()     // Level name
-
+  buffer.getNextString()                            // Level name
   replayData.username = buffer.getNextString()      // Username
 
   if (replayData.username === "") {
     throw new ReplayRejectedError("Replays without authors are not accepted!")
   }
-
 
   buffer.getNextInt32()                             // Starting wave
   buffer.getNextInt32()                             // Endless path
@@ -110,10 +107,10 @@ function parseReplay(data) {
 
   let charNum = buffer.getNextInt32()               // Character
   replayData.character = (charNum === 0) ? "Boki" : "Savant"
-  
+
   // We have to do some extra handling because
   // Boki and Savant share IcyBlockade in different level slots 
-  if (replayData.levelName === "/IcyBlockade"
+  if (filename === "/IcyBlockade"
       && replayData.character === "Savant") {
     filename = "/IcyBlockade-s"
   }
@@ -137,10 +134,25 @@ function parseReplay(data) {
   buffer.getNextInt16()                             // Month
   buffer.getNextInt16()                             // Day
   buffer.getNextInt16()                             // Year
+  
   replayData.score = buffer.getNextInt32()          // Score
-  replayData.minutes = buffer.getNextInt32()        // Minutes
-  replayData.seconds = buffer.getNextInt16()        // Seconds
-  replayData.frames = buffer.getNextInt16()         // Frames
+  
+  let minutes = buffer.getNextInt32()               // Minutes
+  let seconds = buffer.getNextInt16()               // Seconds
+  let frames = buffer.getNextInt16()                // Frames
+
+  // Calculate centiseconds from frames
+  // Every 6th frame update the 10s digit
+  let centiseconds = (Math.floor(frames / 6)) * 10
+  // Every 6 frames the 1s digit corresponds to one of the following:
+  let csones = [0, 1, 3, 5, 7, 9]
+  centiseconds += csones[frames % 6]
+
+  replayData.time = moment.duration({
+    m: minutes,
+    s: seconds,
+    ms: centiseconds * 10
+  })
 
   return replayData
 }

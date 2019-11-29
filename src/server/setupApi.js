@@ -29,10 +29,19 @@ module.exports = app => {
     } else {
       console.log(`File uploaded: ${req.file.originalname}`)
       console.log(req.file)
-      parseReplay(req.file.path).then( replayData => {
-        console.log(replayData)
-        return res.send(replayData)
-      })
+      parseReplay(req.file.path)
+        .then( replayData => {
+          console.log(replayData)
+          return res.json(replayData)
+        })
+        .catch( err => {
+          if (err.name == "ReplayRejectedError"){
+            return res.status(400).send(err.message)
+          } else {
+            console.log(`Internal Error: ${err.message}`)
+            return res.status(500).send("An internal server error occured")
+          }
+        })
       
       
     }

@@ -15,7 +15,7 @@ const upload = multer({
 const db = new ReplayDB()
 
 module.exports = app => {
-  // Handle uploaded files
+  /* Upload .replaykitty files */
   app.post('/upload', upload.single('replay'), (req, res) => {
     if (!req.file) {
       res.status(400).send('No replay uploaded!')
@@ -66,8 +66,16 @@ module.exports = app => {
           console.log('Couldn\'t delete temporary file, something went really wrong.')
           console.log(err.message)
         })
-      
-      
     }
   })
+
+  /* Get replay objects from the database */
+  app.get('/replays', (req, res) => {
+    // Request queries will be the requirements for filtering the results
+    db.getReplays(req.query)
+      .then( replays => {
+        console.log(replays)
+        res.json(replays)
+      })
+  }) 
 }

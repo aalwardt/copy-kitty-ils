@@ -160,9 +160,7 @@ function parseReplay(data) {
 
   // Create a unique filename based on replay data and the current timestamp
   const timestamp = moment().format("x") // Timestamp, unix ms
-  const char = (charNum === 0) ? "B" : "S"
-  const diff = replayData.hardMode ? "H" : "N"
-  replayData.serverFilename = `Level_${replayData.world}-${replayData.level}_${char}_${difficulty}_${replayData.username}_${timestamp}.replaykitty`
+  replayData.serverFilename = `${replayData.world}-${replayData.level} ${replayData.username} ${timestamp}.replaykitty`
 
   return replayData
 }

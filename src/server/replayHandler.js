@@ -2,6 +2,7 @@
  * Parses .replaykitty files to extract relevant data
  */
 const fs = require('fs').promises
+const md5 = require('md5')
 const moment = require('moment')
 const levelMap = require('./levelMap.js')
 
@@ -66,6 +67,9 @@ function parseReplay(data) {
 
   let replayData = {}
   const buffer = new BufferParser(data)
+
+  // Calculate the md5 of the file, to prevent storing duplicates
+  replayData.md5 = md5(data)
 
   /** Step through the file, storing relevant fields **/
   replayData.buildNum = buffer.getNextInt32()       // Build number
@@ -153,6 +157,12 @@ function parseReplay(data) {
     s: seconds,
     ms: centiseconds * 10
   })
+
+  // Create a unique filename based on replay data and the current timestamp
+  const timestamp = moment().format("x") // Timestamp, unix ms
+  const char = (charNum === 0) ? "B" : "S"
+  const diff = replayData.hardMode ? "H" : "N"
+  replayData.serverFilename = `Level_${replayData.world}-${replayData.level}_${char}_${difficulty}_${replayData.username}_${timestamp}.replaykitty`
 
   return replayData
 }

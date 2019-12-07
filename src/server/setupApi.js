@@ -18,28 +18,53 @@ module.exports = app => {
   // Handle uploaded files
   app.post('/upload', upload.single('replay'), (req, res) => {
     if (!req.file) {
-      res.status(400).send("No replay uploaded!")
+      res.status(400).send('No replay uploaded!')
     } else {
       let replayData
-      console.log(`File uploaded: ${req.file.originalname}`)
-      parseReplay(req.file.path)
+      let tmpPath = req.file.path
+      console.log(`\nFile uploaded: ${req.file.originalname}`)
+
+      // Parse the replay file
+      parseReplay(tmpPath)
         .then( replay => {
           replayData = replay
           // Insert the replay into the database
           return db.addReplay(replay)
         })
         .then( dbResult => {
-          // Insertion successful! 
-          return res.json(replayData)
+          // Send the replay object in the response
+          res.json(replayData)
+
+          // Move the file from tmp/ to replays/
+          let newPath = path.join(config.REPLAY_DIR, replayData.serverFilename)
+          console.log(`\tReplay file uploaded to ${newPath}`)
+
+          return fs.rename(tmpPath, newPath)          
         })
         .catch( err => {
-          if (err.name == "ReplayRejectedError" || err.name == "DuplicateReplayError"){
-            return res.status(400).send(err.message)
-          } else {
-            console.log(`Internal Error: ${err.message}`)
-            console.log(err)
-            return res.status(500).send("An internal server error occured")
+          // Error! Send the appropriate response
+          switch (err.name) {
+            case 'conflict':
+              err.message = 'Already uploaded!'
+            case 'ReplayRejectedError':
+              console.log(`\tReplay file rejected: ${err.message}`)
+              res.status(400).send(err.message)
+              break
+
+            default:
+              console.log(`\tInternal Error: ${err.message}`)
+              console.log(err)
+              res.status(500).send('An internal server error occured')
+              break
           }
+
+          // Delete the temporary file
+          return fs.unlink(tmpPath)
+        })
+        .catch( err => {
+          // Catch any errors caused by deleting the file
+          console.log('Couldn\'t delete temporary file, something went really wrong.')
+          console.log(err.message)
         })
       
       

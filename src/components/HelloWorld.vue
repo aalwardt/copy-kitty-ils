@@ -1,6 +1,5 @@
 <template>
 	<div>
-		<p>Hi canjie</p>
 		<form action="/upload" method="post" enctype="multipart/form-data">
 			<input type="file" name="replay" />
 			<input type="submit" name="submit" value="Submit" />

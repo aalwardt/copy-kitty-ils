@@ -31,7 +31,7 @@ module.exports = app => {
           // Insert the replay into the database
           return db.addReplay(replay)
         })
-        .then( dbResult => {
+        .then( () => {
           // Send the replay object in the response
           res.json(replayData)
 
@@ -43,21 +43,14 @@ module.exports = app => {
         })
         .catch( err => {
           // Error! Send the appropriate response
-          switch (err.name) {
-            case 'conflict':
-              err.message = 'Already uploaded!'
-            case 'ReplayRejectedError':
-              console.log(`\tReplay file rejected: ${err.message}`)
-              res.status(400).send(err.message)
-              break
-
-            default:
-              console.log(`\tInternal Error: ${err.message}`)
-              console.log(err)
-              res.status(500).send('An internal server error occured')
-              break
+          if (err.name === 'ReplayRejectedError') {
+            console.log(`\tReplay file rejected: ${err.message}`)
+            res.status(400).send(err.message)
+          } else {
+            console.log(`\tInternal Error: ${err.message}`)
+            console.log(err)
+            res.status(500).send('An internal server error occured')
           }
-
           // Delete the temporary file
           return fs.unlink(tmpPath)
         })
@@ -72,6 +65,16 @@ module.exports = app => {
   /* Get replay objects from the database */
   app.get('/replays', (req, res) => {
     // Request queries will be the requirements for filtering the results
+    console.log('Replays requested')
+    // Convert world and level strings to ints
+    if (req.query.hasOwnProperty('world')) { 
+      req.query.world = parseInt(req.query.world)
+    }
+    if (req.query.hasOwnProperty('level')) {
+      req.query.level = parseInt(req.query)
+    }
+    console.log(req.query)
+
     db.getReplays(req.query)
       .then( replays => {
         console.log(replays)

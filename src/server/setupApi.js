@@ -1,44 +1,43 @@
 const path = require('path')
 const fs = require('fs').promises
 const multer = require('multer')
-const PouchDB = require('pouchdb-node')
 
+const config = require('./serverConfig.js')
 const parseReplay = require('./replayHandler.js')
-
-/** Directories used for storage **/
-const TEMP_DIR = 'tmp'
-const REPLAY_DIR = 'replays'
-const DATABASE_DIR = 'db'
+const ReplayDB = require('./replayDatabase.js')
 
 /** Setup multer options **/
 const upload = multer({
   // storage: storage,
-  dest: TEMP_DIR
+  dest: config.TEMP_DIR
 })
-/** Setup database **/
-const db = new PouchDB('db')
+
+const db = new ReplayDB()
 
 module.exports = app => {
   // Handle uploaded files
   app.post('/upload', upload.single('replay'), (req, res) => {
     if (!req.file) {
-      console.log('No file received')
-      return res.send({
-        success: false
-      })
+      res.status(400).send("No replay uploaded!")
     } else {
+      let replayData
       console.log(`File uploaded: ${req.file.originalname}`)
-      console.log(req.file)
       parseReplay(req.file.path)
-        .then( replayData => {
-          console.log(replayData)
+        .then( replay => {
+          replayData = replay
+          // Insert the replay into the database
+          return db.addReplay(replay)
+        })
+        .then( dbResult => {
+          // Insertion successful! 
           return res.json(replayData)
         })
         .catch( err => {
-          if (err.name == "ReplayRejectedError"){
+          if (err.name == "ReplayRejectedError" || err.name == "DuplicateReplayError"){
             return res.status(400).send(err.message)
           } else {
             console.log(`Internal Error: ${err.message}`)
+            console.log(err)
             return res.status(500).send("An internal server error occured")
           }
         })

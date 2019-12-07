@@ -85,7 +85,7 @@ function parseReplay(data) {
 
   buffer.getNextInt32()                             // Random seed
   let filename = buffer.getNextString()             // Filename
-  buffer.getNextString()                            // Level name
+  replayData.levelName = buffer.getNextString()         // Level name
   replayData.username = buffer.getNextString()      // Username
 
   if (replayData.username === "") {
